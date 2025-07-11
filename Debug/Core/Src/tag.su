@@ -1,0 +1,3 @@
+../Core/Src/tag.c:15:10:findTag	24	static
+../Core/Src/tag.c:25:6:isTagRegistered	16	static
+../Core/Src/tag.c:30:6:updateCoins	24	static
