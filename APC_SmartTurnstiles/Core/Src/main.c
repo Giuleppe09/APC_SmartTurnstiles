@@ -96,12 +96,12 @@ int main(void){
   MX_SPI1_Init();
   MX_USB_PCD_Init();
   /* USER CODE BEGIN 2 */
-  	uchar status_request=0;
-    uchar TagType[2] = {0,0};
-    uchar serNum[5]= {0,0,0,0,0};	//Per memorizzare il seriale del tag
-    int seriale[5] = {0,0,0,0,0};
-    TagData* tag;
-    MFRC522_Init();
+  uchar status_request=0;
+  uchar TagType[2] = {0,0};
+  uchar serNum[5]= {0,0,0,0,0};	//Per memorizzare il seriale del tag
+  int seriale[5] = {0,0,0,0,0};
+  TagData* tag;
+  MFRC522_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
