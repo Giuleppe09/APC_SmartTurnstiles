@@ -24,7 +24,6 @@
 /* USER CODE BEGIN Includes */
 #include "rc522.h"
 #include <stdbool.h> // Aggiungi questa riga per il tipo bool
-#include "string.h"
 #include "Tag.h"
 /* USER CODE END Includes */
 
@@ -101,6 +100,7 @@ int main(void){
     uchar TagType[2] = {0,0};
     uchar serNum[5]= {0,0,0,0,0};	//Per memorizzare il seriale del tag
     int seriale[5] = {0,0,0,0,0};
+    TagData* tag;
     MFRC522_Init();
   /* USER CODE END 2 */
 
@@ -109,7 +109,6 @@ int main(void){
   while (1){
 	  if (isSensorDetected()){
 	        // Il sensore RC522 è stato rilevato e sta comunicando correttamente
-	        // Puoi accendere un LED diverso o mantenere acceso un LED fisso
 	        HAL_GPIO_WritePin(LD10_GPIO_Port, LD10_Pin, GPIO_PIN_SET); // Esempio: Accendi un LED specifico per "sensore ok"
 	        HAL_Delay(10); // Piccolo ritardo per stabilità
 
@@ -118,14 +117,25 @@ int main(void){
 	        if (status_request == MI_OK)
 	        {
 	          // Tag RFID rilevato!
-	          HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET); // Accendi il LED (es. LD3)
-	          HAL_Delay(500); // Mantieni il LED acceso per un po'
+	          HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET); // Accendi il LED
 
 	          status_request = MFRC522_Anticoll(serNum);
 	          if (status_request == MI_OK)
 	          {
-	        	 for(int i=0;i<5;i++){
-	        		seriale[i] = (int) serNum[i];
+
+
+	        	 if(isTagRegistered(&serNum)){
+	        		 tag = findTag(&serNum);
+	        		 //Tag Riconosciuto.
+	        		 HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET); // Accendi il LED VERDE 7
+
+	        		 //Invia allo schermino ecc ecc ecc.
+	        		 HAL_Delay(1000);
+	        		 HAL_GPIO_WritePin(LD7_GPIO_Port,LD7_Pin,GPIO_PIN_RESET);
+	        	 }else{
+	        		 HAL_GPIO_WritePin(LD6_GPIO_Port,LD6_Pin,GPIO_PIN_SET);
+	        		 HAL_Delay(1000);
+	        		 HAL_GPIO_WritePin(LD6_GPIO_Port,LD6_Pin,GPIO_PIN_RESET);
 	        	 }
 	          }
 	        }
@@ -142,8 +152,7 @@ int main(void){
 	        HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET); // Assicurati che anche il LED del tag sia spento
 	        HAL_Delay(500); // Breve ritardo prima di riprovare a rilevare il sensore
 	    }
-	    HAL_Delay(100); // Breve ritardo per evitare polling eccessivo generale
-	    // === Fine del codice di rilevamento del sensore e del tag ===
+	    HAL_Delay(100);
   	  }
 
     /* USER CODE END WHILE */
@@ -151,9 +160,7 @@ int main(void){
     /* USER CODE BEGIN 3 */
 
   /* USER CODE END 3 */
-
 }
-
 /**
   * @brief System Clock Configuration
   * @retval None
