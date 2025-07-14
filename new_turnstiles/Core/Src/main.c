@@ -127,6 +127,13 @@ void i2c_scanner(void)
     // when ret == HAL_OK will be your LCD address.
 }
 
+// Funzione per tagliare una stringa a una lunghezza massima
+void truncateString(char* str, size_t maxLength) {
+    if (strlen(str) > maxLength) {
+        str[maxLength] = '\0';
+    }
+}
+
 void delay (uint16_t us)
 {
 	__HAL_TIM_SET_COUNTER(&htim1, 0);
@@ -301,154 +308,154 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	  // Controlla se 32 bit sono stati ricevuti (il flag bitCount lo indica)
-	  if (32 <= bitCount)
-	  {
-		  // Qui puoi elaborare il valore di 'receivedData'
-		  // Esempio: stampalo sul display LCD o su seriale, o confrontalo con codici di pulsanti noti
+	  if (32 <= bitCount) // Gestione sensore IR
+	        {
+	            char ir_buffer[17]; // Max 16 caratteri
+	            snprintf(ir_buffer, 17, "IR DATA: 0x%lX", receivedData);
+	            lcd_display_message_lines("RICEVUTO IR:", ir_buffer);
+	            HAL_Delay(2000);
 
-		  lcd_clear();
-		  lcd_put_cur(0,0);
-		  char ir_buffer[20];
-		  sprintf(ir_buffer, "IR Data: 0x%lX", receivedData); // Stampa il dato in esadecimale
-		  lcd_send_string(ir_buffer);
-		  HAL_Delay(2000); // Visualizza per 2 secondi
+	            if (receivedData == receivedData) // Logica IR
+	            {
+	                lcd_display_message_lines("ACCESSO", "CONSENTITO!");
+	                HAL_Delay(1000);
+	                //APERTURA TORNELLO
+					for (int i = 0; i <= 360; i++) {
+						Stepper_rotate((float)i, 10);
+					}
+					HAL_Delay(1000);
+					//CHIUSURA TORNELLO
+					for (int i = 360; i >= 0; i--) {
+						Stepper_rotate((float)i, 10);
+					}
 
+	                lcd_display_message_lines("ARRIVEDERCI", "da Pozzuoli");
+	                HAL_Delay(1000);
+	            }
+	            else
+	            {
+	                lcd_display_message_lines("IR: CODICE", "SCONOSCIUTO!");
+	                HAL_Delay(2000);
+	            }
 
-			// Puoi premere qualsiasi tasto
-			if (receivedData == receivedData) // Esempio: se il codice IR ricevuto è quello per l'apertura
-			{
-				lcd_clear();
-				lcd_display_message_lines("Accesso", "Consentito!");
-				HAL_Delay(1000); // Breve ritardo per visualizzare il messaggio
+	            bitCount = 0;
+	            receivedData = 0;
+	            isStartCaptured = 0;
+	            HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+	        }
 
-				// APERTURA TORNELLO: Rotazione completa del tornello
-				for (int i = 0; i <= 360; i++) // Fa un giro completo in senso orario
-				{
-					Stepper_rotate((float)i, 10); // Passa l'angolo come float
-				}
-				// currentAngle è ora 360
+	        if (isSensorDetected()){
+	              HAL_GPIO_WritePin(LD10_GPIO_Port, LD10_Pin, GPIO_PIN_SET);
+	              HAL_Delay(10);
+	              status_request = MFRC522_Request(PICC_REQIDL, TagType);
 
-				// CHIUSURA TORNELLO: Torna alla posizione iniziale
-				for (int i = 360; i >= 0; i--) // Torna indietro in senso antiorario
-				{
-					Stepper_rotate((float)i, 10); // Passa l'angolo come float
-				}
-				lcd_display_message_lines("Tornello", "chiuso");
-				HAL_Delay(1000);
-			}
-			else
-			{
-				lcd_clear();
-				lcd_display_message_lines("IR: Codice", "Sconosciuto!");
-				HAL_Delay(2000); // Mostra messaggio di negato
-			}
+	              if (status_request == MI_OK)
+	              {
+	                HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+	                lcd_display_message_lines("TAG RFID", "RILEVATO!");
+	                HAL_Delay(500);
 
-		  // Dopo aver elaborato i dati, resetta le variabili per ricevere il prossimo segnale
-		  bitCount = 0;
-		  receivedData = 0;
-		  isStartCaptured = 0;
-		  HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1); // Riavvia l'Input Capture per la prossima ricezione
-	  }
+	                status_request = MFRC522_Anticoll(serNum);
+	                if (status_request == MI_OK)
+	                {
+	                   if(isTagRegistered(&serNum)){
+	                       tag = findTag(&serNum);
+	                       HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET);
 
-	 if (isSensorDetected()){
-			// Il sensore RC522 è stato rilevato e sta comunicando correttamente
-			HAL_GPIO_WritePin(LD10_GPIO_Port, LD10_Pin, GPIO_PIN_SET);
-			HAL_Delay(10); // Piccolo ritardo per stabilità
-			status_request = MFRC522_Request(PICC_REQIDL, TagType); // Cerca un tag in modalità idle
+	                       char tagName[MAX_STRING_LENGTH];
+	                       char tagSurname[MAX_STRING_LENGTH];
+	                       char dispLine1[17]; // Buffer per LCD linea 1
+	                       char dispLine2[17]; // Buffer per LCD linea 2
 
-			if (status_request == MI_OK)
-			{
-			  // Tag RFID rilevato!
-			  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET); // Accendi il LED che indica tag presente
-			  lcd_display_message_lines("Tag RFID","Rilevato!");
+	                       getNamesBySerial(serNum, tagName, sizeof(tagName), tagSurname, sizeof(tagSurname));
 
-			  status_request = MFRC522_Anticoll(serNum);
-			  if (status_request == MI_OK)
-			  {
-				 if(isTagRegistered(&serNum)){
-					 tag = findTag(&serNum);
-					 // Tag Riconosciuto.
-					 HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET); // Accendi il LED VERDE 7
+	                       // Assicurati che nome e cognome non superino i 16 caratteri per la visualizzazione
+	                       truncateString(tagName, 16);
+	                       truncateString(tagSurname, 16);
 
-					 char tagName[32];
-					 char tagSurname[32];
-					 bool tagFoundAndCopied = getNamesBySerial(serNum, tagName, sizeof(tagName), tagSurname, sizeof(tagSurname));
+	                       snprintf(dispLine1, 17, "Ciao %s", tagName);
+	                       lcd_display_message_lines(dispLine1, tagSurname);
+	                       HAL_Delay(1000);
+	                       // Visualizza la stazione di partenza attuale del tag
+	                       snprintf(dispLine2, 17, "FROM: %s", tag->departureStation);
+	                       truncateString(dispLine2, 16); // Tronca se la stazione è troppo lunga
+	                       lcd_display_message_lines(tagSurname, dispLine2);
+	                       HAL_Delay(2000);
 
-					 if (tagFoundAndCopied)
-					     {
-					         // Tag Riconosciuto.
-					         HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET); // Accendi il LED VERDE 7
+	                       TicketProcessResult result = processTicketPayment(tag);
 
-					         lcd_clear();
-					         lcd_put_cur(0, 0);
-					         sprintf(displayBuffer, "ciao %s", tagName);
-					         lcd_send_string(displayBuffer);    // Stampa il nome
-					         lcd_put_cur(1, 0);
-					         lcd_send_string(tagSurname); // Stampa il cognome
+	                       switch (result.accessType) {
+	                           case ACCESS_ENTER:
+	                               lcd_display_message_lines(result.messageLine1, result.messageLine2);
+	                               HAL_Delay(1000);
+	                               //APERTURA TORNELLO
+									for (int i = 0; i <= 360; i++) {
+										Stepper_rotate((float)i, 10);
+									}
+									HAL_Delay(1000);
+									//CHIUSURA TORNELLO
+									for (int i = 360; i >= 0; i--) {
+										Stepper_rotate((float)i, 10);
+									}
+	                               HAL_Delay(1000);
+	                               lcd_display_message_lines("TORNELLO APERTO", "BENVENUTO!");
+	                               HAL_Delay(1000);
+	                               break;
 
-					         //APERTURA TORNELLO: Rotazione completa del tornello
-							 for (int i=0; i<=360; i++) // Fa un giro completo in senso orario
-							 {
-							   Stepper_rotate((float)i, 10); // Passa l'angolo come float
-							   // HAL_Delay(X) qui rallenta il movimento, se vuoi un movimento più fluido,
-							   // la velocità è controllata dall'RPM
-							 }
-							  // currentAngle è ora 360
+	                           case ACCESS_EXIT:
+	                               lcd_display_message_lines(result.messageLine1, result.messageLine2);
+	                               HAL_Delay(1000);
+	                               //APERTURA TORNELLO
+									for (int i = 0; i <= 360; i++) {
+										Stepper_rotate((float)i, 10);
+									}
+									HAL_Delay(1000);
+									//CHIUSURA TORNELLO
+									for (int i = 360; i >= 0; i--) {
+										Stepper_rotate((float)i, 10);
+									}
+	                               lcd_display_message_lines("TORNELLO CHIUSO", "ARRIVEDERCI!");
+	                               HAL_Delay(1000);
+	                               break;
 
-							 // CHIUSURA TORNELLO: Torna alla posizione iniziale
-							 for (int i=360; i>=0; i--) // Torna indietro in senso antiorario
-							 {
-							   Stepper_rotate((float)i, 10); // Passa l'angolo come float
-							   // HAL_Delay(X) qui rallenta il movimento
-							 }
+	                           case ACCESS_DENIED:
+	                               lcd_display_message_lines(result.messageLine1, result.messageLine2);
+	                               if (result.showRedLed) {
+	                                   HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
+	                                   HAL_Delay(2000);
+	                                   HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_RESET);
+	                               }
+	                               HAL_Delay(1000);
+	                               break;
+	                       }
 
-					         HAL_Delay(2000); // Visualizza nome e cognome
+	                       HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_RESET);
+	                       HAL_Delay(50);
+	                       lcd_display_message_lines("Inserire card"," o biglietto ");
 
-					         // Poi il resto della tua logica per "Accesso Consentito"
-					         lcd_display_message_lines("Accesso","Consentito!");
-
-
-
-					         lcd_display_message_lines("Arrivederci ","e Buon viaggio");
-
-							 HAL_Delay(2000); // Tempo per visualizzare il messaggio "Arrivederci"
-					     }
-					 // Torna allo stato iniziale dopo il ciclo completo
-					 lcd_display_message_lines("Inserire card"," o biglietto ");
-
-					 HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_RESET); // Spegni LED verde
-					 HAL_Delay(50); // Breve delay per stabilità
-				 }else{
-					 // Tag NON Riconosciuto.
-					 HAL_GPIO_WritePin(LD6_GPIO_Port,LD6_Pin,GPIO_PIN_SET); // Accendi il LED ROSSO 6
-
-					 lcd_display_message_lines("Accesso ","Negato!");
-
-					 HAL_Delay(2000); // Mostra messaggio di negato
-					 HAL_GPIO_WritePin(LD6_GPIO_Port,LD6_Pin,GPIO_PIN_RESET); // Spegni LED rosso
-					 HAL_Delay(50); // Breve delay per stabilità
-
-					 lcd_display_message_lines("Inserire card"," o biglietto ");
-				 }
-			}
-			else
-			{
-			  // Nessun tag rilevato o errore nella richiesta del tag
-			  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET); // Spegni il LED che indica tag presente
-			}
-		}
-		else
-		{
-			// Il sensore RC522 NON è stato rilevato o non sta comunicando
-			HAL_GPIO_WritePin(LD10_GPIO_Port, LD10_Pin, GPIO_PIN_RESET); // Spegni il LED "sensore ok"
-			HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET); // Assicurati che anche il LED del tag sia spento
-
-			HAL_Delay(500); // Breve ritardo prima di riprovare a rilevare il sensore
-		}
-		// Questo delay rallenta l'intero loop, rimuovilo o riducilo se hai bisogno di risposte più veloci
-		// HAL_Delay(100);
-	 }
-  }
+	                   }else{
+	                       // Tag NON Riconosciuto.
+	                       HAL_GPIO_WritePin(LD6_GPIO_Port,LD6_Pin,GPIO_PIN_SET);
+	                       lcd_display_message_lines("ACCESSO", "NEGATO!");
+	                       HAL_Delay(2000);
+	                       HAL_GPIO_WritePin(LD6_GPIO_Port,LD6_Pin,GPIO_PIN_RESET);
+	                       HAL_Delay(50);
+	                       lcd_display_message_lines("Inserire card"," o biglietto ");
+	                   }
+	              }
+	              else
+	              {
+	                HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+	              }
+	          }
+	          else
+	          {
+	              HAL_GPIO_WritePin(LD10_GPIO_Port, LD10_Pin, GPIO_PIN_RESET);
+	              HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+	              HAL_Delay(500);
+	          }
+	       }
+	    }
   /* USER CODE END 3 */
 }
 
@@ -841,7 +848,6 @@ static void MX_GPIO_Init(void)
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
-    // Assicurati che sia il timer e il canale corretto che ha generato l'interruzione
     if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) // Adatta TIM2 e TIM_CHANNEL_1 se usi un altro timer/canale
     {
         if(0 == bitCount && 0 == isStartCaptured && 0 == receivedData)

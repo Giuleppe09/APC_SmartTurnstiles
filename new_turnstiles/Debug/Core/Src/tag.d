@@ -33,7 +33,8 @@ Core/Src/tag.o: ../Core/Src/tag.c ../Core/Inc/tag.h ../Core/Inc/rc522.h \
  ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_tim.h \
  ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_tim_ex.h \
  ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_uart.h \
- ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_uart_ex.h
+ ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_uart_ex.h \
+ ../Core/Inc/lcd_i2c.h ../Core/Inc/main.h
 ../Core/Inc/tag.h:
 ../Core/Inc/rc522.h:
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal.h:
@@ -71,3 +72,5 @@ Core/Src/tag.o: ../Core/Src/tag.c ../Core/Inc/tag.h ../Core/Inc/rc522.h \
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_tim_ex.h:
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_uart.h:
 ../Drivers/STM32F3xx_HAL_Driver/Inc/stm32f3xx_hal_uart_ex.h:
+../Core/Inc/lcd_i2c.h:
+../Core/Inc/main.h:

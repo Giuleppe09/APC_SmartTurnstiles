@@ -1,5 +1,7 @@
-../Core/Src/tag.c:19:10:findTag	24	static
-../Core/Src/tag.c:29:8:returnNameSurname	32	static
-../Core/Src/tag.c:61:6:getNamesBySerial	32	static
-../Core/Src/tag.c:88:6:isTagRegistered	16	static
-../Core/Src/tag.c:93:6:updateCoins	24	static
+../Core/Src/tag.c:24:10:findTag	24	static
+../Core/Src/tag.c:34:8:returnNameSurname	32	static
+../Core/Src/tag.c:66:6:getNamesBySerial	32	static
+../Core/Src/tag.c:93:6:isTagRegistered	16	static
+../Core/Src/tag.c:98:6:updateCoins	24	static
+../Core/Src/tag.c:112:6:updateDepartureStation	24	static
+../Core/Src/tag.c:124:21:processTicketPayment	216	static

@@ -1,14 +1,19 @@
 #include <tag.h>
+#include <lcd_i2c.h>
 #include <stdlib.h> // Necessario per malloc, free, strdup
 #include <string.h> // Necessario per memcmp, strdup
 
 // --- Global variables (defined and initialized here) ---
 int numRegisteredTags = 4;
 TagData registeredTags[MAX_REGISTERED_TAGS] = {
-    {"Giuseppe","Castaldo",{0x92, 0x60, 0x92, 0xab, 0xcb}, 10},
-    {"Cristina","Carleo",{0x13, 0x0f, 0x28, 0x21, 0x14}, 5}, //Questo lo metto a caso.
-    {"Antonio","Emmanuele",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 5},//carta Cris
-    {"Vincenzo", "Bruno",{0x12, 0xc9, 0x92, 0xab, 0xe2}, 5} //tag Cris
+    {"Giuseppe","Castaldo",{0x92, 0x60, 0x92, 0xab, 0xcb}, 100, "Napoli SG"},
+    {"Cristina","Carleo",{0x13, 0x0f, 0x28, 0x21, 0x14}, 50, "Bagnoli"}, // Pozzuoli: accesso libero
+    {"Antonio","Emmanuele",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 500, "Napoli SG"},//carta Cris
+    {"Vincenzo", "Bruno",{0x12, 0xc9, 0x92, 0xab, 0xe2}, 500, "Bagnoli"} //tag Cris
+//    {"Antonio","Emmanuele",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 500, "Pozzuoli"},//carta Cris
+//    {"Vincenzo", "Bruno",{0x12, 0xc9, 0x92, 0xab, 0xe2}, 5000, null } //tag Cris
+//    {"Antonio","Emmanuele",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 50, "Napoli san giovanni"},//carta Cris
+//    {"Vincenzo", "Bruno",{0x12, 0xc9, 0x92, 0xab, 0xe2}, 50, "Bagnoli"} //tag Cris
 
 };
 
@@ -101,4 +106,92 @@ bool updateCoins(unsigned char* serNum, int amount) {
         }
     }
     return false; // Tag not found
+}
+
+// Function to update Departure Station for a given tag
+bool updateDepartureStation(uchar* serNum, const char* newStation) {
+    TagData* tag = findTag(serNum);
+    if (tag != NULL) {
+        // Copia la nuova stazione nel campo departureStation
+        strncpy(tag->departureStation, newStation, MAX_STRING_LENGTH - 1);
+        tag->departureStation[MAX_STRING_LENGTH - 1] = '\0'; // Assicura la terminazione della stringa
+        return true;
+    }
+    return false; // Tag non trovato
+}
+
+
+TicketProcessResult processTicketPayment(TagData* tag) {
+    TicketProcessResult result;
+    result.accessType = ACCESS_DENIED;
+    result.showRedLed = false;
+
+    if (tag == NULL) {
+        snprintf(result.messageLine1, 17, "ERRORE TAG"); // Max 16 + null
+        snprintf(result.messageLine2, 17, "NON VALIDO!");
+        return result;
+    }
+
+    char tempBuffer[MAX_STRING_LENGTH]; // Buffer temporaneo per sprintf
+
+    if (strcmp(tag->departureStation, "Pozzuoli") == 0) {
+        snprintf(result.messageLine1, 17, "USCITA Pozzuoli");
+        snprintf(result.messageLine2, 17, "TORNELLO APERTO");
+        result.accessType = ACCESS_EXIT;
+        updateDepartureStation(tag->serialNum, "");
+    } else if (strcmp(tag->departureStation, "Bagnoli") == 0) {
+        int costoBagnoli = 130;
+        if (updateCoins(tag->serialNum, -costoBagnoli)) {
+            int euroScalati = costoBagnoli / 100;
+            int centesimiScalati = costoBagnoli % 100;
+            snprintf(tempBuffer, MAX_STRING_LENGTH, "SCALATI: %d.%02dE", euroScalati, centesimiScalati);
+            snprintf(result.messageLine1, 17, "%s", tempBuffer); // Tronca a 16
+
+            snprintf(tempBuffer, MAX_STRING_LENGTH, "CREDITO: %d.%02dE", tag->coins / 100, tag->coins % 100);
+            snprintf(result.messageLine2, 17, "%s", tempBuffer); // Tronca a 16
+
+            // Questi messaggi verranno visualizzati dal main dopo aver chiamato questa funzione
+            result.accessType = ACCESS_EXIT;
+            updateDepartureStation(tag->serialNum, "");
+        } else {
+            snprintf(result.messageLine1, 17, "ACCESSO NEGATO");
+            snprintf(result.messageLine2, 17, "CREDITO INSUFF.");
+            result.showRedLed = true;
+            result.accessType = ACCESS_DENIED;
+        }
+    } else if (strcmp(tag->departureStation, "Napoli SG") == 0) {
+        int costoSanGiovanni = 310;
+        if (updateCoins(tag->serialNum, -costoSanGiovanni)) {
+            int euroScalati = costoSanGiovanni / 100;
+            int centesimiScalati = costoSanGiovanni % 100;
+            snprintf(tempBuffer, MAX_STRING_LENGTH, "SCALATI: %d.%02dE", euroScalati, centesimiScalati);
+            snprintf(result.messageLine1, 17, "%s", tempBuffer);
+
+            snprintf(tempBuffer, MAX_STRING_LENGTH, "CREDITO: %d.%02dE", tag->coins / 100, tag->coins % 100);
+            snprintf(result.messageLine2, 17, "%s", tempBuffer);
+
+            result.accessType = ACCESS_EXIT;
+            updateDepartureStation(tag->serialNum, "");
+        } else {
+            snprintf(result.messageLine1, 17, "ACCESSO NEGATO");
+            snprintf(result.messageLine2, 17, "CREDITO INSUFF.");
+            result.showRedLed = true;
+            result.accessType = ACCESS_DENIED;
+        }
+    }
+    // Logica di entrata: se la stazione di partenza è vuota o sconosciuta
+    else if (strlen(tag->departureStation) == 0 || strcmp(tag->departureStation, "Sconosciuta") == 0) {
+        snprintf(result.messageLine1, 17, "ARRIVEDERCI");
+        snprintf(result.messageLine2, 17, "DA POZZUOLI"); // Stazione di entrata predefinita
+        result.accessType = ACCESS_ENTER;
+        updateDepartureStation(tag->serialNum, "Pozzuoli"); // Aggiorna la stazione del tag
+    }
+    else {
+        snprintf(result.messageLine1, 17, "STAZ. NON GEST.");
+        snprintf(result.messageLine2, 17, "ACCESSO NEGATO!");
+        result.showRedLed = true;
+        result.accessType = ACCESS_DENIED;
+    }
+
+    return result;
 }
