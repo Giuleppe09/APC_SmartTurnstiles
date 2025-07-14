@@ -1,0 +1,5 @@
+../Core/Src/tag.c:19:10:findTag	24	static
+../Core/Src/tag.c:29:8:returnNameSurname	32	static
+../Core/Src/tag.c:61:6:getNamesBySerial	32	static
+../Core/Src/tag.c:88:6:isTagRegistered	16	static
+../Core/Src/tag.c:93:6:updateCoins	24	static

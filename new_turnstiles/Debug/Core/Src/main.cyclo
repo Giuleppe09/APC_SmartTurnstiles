@@ -1,0 +1,17 @@
+../Core/Src/main.c:86:6:i2c_scanner	3
+../Core/Src/main.c:130:6:delay	2
+../Core/Src/main.c:136:6:stepper_set_rpm	1
+../Core/Src/main.c:141:6:stepper_half_drive	9
+../Core/Src/main.c:195:6:stepper_step_angle	6
+../Core/Src/main.c:222:6:Stepper_rotate	3
+../Core/Src/main.c:243:5:main	12
+../Core/Src/main.c:459:6:SystemClock_Config	4
+../Core/Src/main.c:511:13:MX_I2C1_Init	4
+../Core/Src/main.c:559:13:MX_SPI1_Init	2
+../Core/Src/main.c:599:13:MX_TIM1_Init	4
+../Core/Src/main.c:646:13:MX_TIM2_Init	4
+../Core/Src/main.c:694:13:MX_USART1_UART_Init	2
+../Core/Src/main.c:729:13:MX_USB_PCD_Init	2
+../Core/Src/main.c:760:13:MX_GPIO_Init	1
+../Core/Src/main.c:842:6:HAL_TIM_IC_CaptureCallback	15
+../Core/Src/main.c:898:6:Error_Handler	1
