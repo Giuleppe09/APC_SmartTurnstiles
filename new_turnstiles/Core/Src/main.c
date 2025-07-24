@@ -848,23 +848,23 @@ static void MX_GPIO_Init(void)
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) // Adatta TIM2 e TIM_CHANNEL_1 se usi un altro timer/canale
+    if (htim->Instance == TIM2 && htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) // Abbiamo usato TIM2 Canale 1
     {
         if(0 == bitCount && 0 == isStartCaptured && 0 == receivedData)
         {
-            // Primo fronte di discesa del bit di start (9ms)
+            // Primo fronte di salita del bit di start (9ms)
             isStartCaptured = 1;
         }
         else if(0 == bitCount && 1 == isStartCaptured && 0 == receivedData)
         {
-            // Secondo fronte di discesa del bit di start (dopo 4.5ms)
+            // Secondo fronte di salita del bit di start (dopo 4.5ms)
             // Resetta il contatore del timer per misurare la durata del primo bit di dati
             __HAL_TIM_SET_COUNTER(htim, 0);
             isStartCaptured = 2; // Passa allo stato di acquisizione dati
         }
         else if(32 > bitCount) // Abbiamo ancora bit da ricevere (32 bit per il protocollo NEC)
         {
-            IC_Value = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1); // Legge il valore catturato
+            IC_Value = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
             __HAL_TIM_SET_COUNTER(htim, 0); // Resetta il contatore per la prossima misurazione
 
             // Decodifica il bit basandosi sulla durata dell'impulso
@@ -876,12 +876,12 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
             // Received Logic '0'
             if(IC_Value > 1000 && IC_Value < 1300) // Questo è il tempo dello "SPACE" per un 0 (~1.125ms)
             {
-                receivedData &= ~(1UL << bitCount); // Imposta il bit a 0
+                receivedData &= ~(1UL << bitCount); // Imposta il bit in pos bitCount a 0
             }
             // Received Logic '1'
             else if(IC_Value > 2100 && IC_Value < 2400) // Questo è il tempo dello "SPACE" per un 1 (~2.25ms)
             {
-                receivedData |= (1UL << bitCount); // Imposta il bit a 1
+                receivedData |= (1UL << bitCount); // Imposta il bit in pos bitCount a 1
             }
             // ELSE: se il valore non rientra in questi range, è un errore o una tempistica non NEC
 

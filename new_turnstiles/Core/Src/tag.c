@@ -6,10 +6,10 @@
 // --- Global variables (defined and initialized here) ---
 int numRegisteredTags = 4;
 TagData registeredTags[MAX_REGISTERED_TAGS] = {
-    {"Giuseppe","Castaldo",{0x92, 0x60, 0x92, 0xab, 0xcb}, 100, "Napoli SG"},
-    {"Cristina","Carleo",{0x13, 0x0f, 0x28, 0x21, 0x14}, 50, "Bagnoli"}, // Pozzuoli: accesso libero
-    {"Antonio","Emmanuele",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 500, "Napoli SG"},//carta Cris
-    {"Vincenzo", "Bruno",{0x12, 0xc9, 0x92, 0xab, 0xe2}, 500, "Bagnoli"} //tag Cris
+    {"Giuseppe","Castaldo",{0x92, 0x60, 0x92, 0xab, 0xcb}, 310, "Napoli SG"},
+    {"Antonio","Emmanuele",{0x13, 0x0f, 0x29, 0x21, 0x14}, 500, "Napoli SG"}, // Pozzuoli: accesso libero
+    {"Cristina","Carleo",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 500, "Bagnoli"},//carta Cris
+    {"Vincenzo", "Bruno",{0x12, 0xc9, 0x92, 0xab, 0xe2}, 50, "Bagnoli"} //tag Cris
 //    {"Antonio","Emmanuele",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 500, "Pozzuoli"},//carta Cris
 //    {"Vincenzo", "Bruno",{0x12, 0xc9, 0x92, 0xab, 0xe2}, 5000, null } //tag Cris
 //    {"Antonio","Emmanuele",{0xe3, 0x28, 0x11, 0x22, 0xf8}, 50, "Napoli san giovanni"},//carta Cris
