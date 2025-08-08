@@ -1,0 +1,118 @@
+**********AREA DATI**************************************
+	ORG	$8000
+MSG	DC.B	1,2,3,4,5,0,1,2,3,4,1,2,3,4,5,0,1,2,3,4,0,1,2,3,4,0,1,2,3,4,1,2,3,4,5,0,1,2,3,4,0,1,2,3,4
+		
+COUNT		DC.B	0
+
+***********AREA MAIN*********************************	
+	ORG    $8200
+
+PIADB	EQU    $2006	;indirizzo di PIA-B dato, usato in output 
+PIACB	EQU    $2007	;indirizzo di PIA-B controllo
+
+MAIN	JSR    DVBOUT	;inizializza PIA porto B in output
+
+	MOVEA.L	#PIACB,A1	;indirizzo registro di controllo CRB
+	MOVEA.L	#PIADB,A2	;indirizzo registro PRB
+	MOVEA.L	#MSG,A0	;indirizzo area messaggio
+
+	MOVE.W	SR,D0	;legge il registro di stato
+	ANDI.W	#$D8FF,D0 ;maschera per reg stato (stato utente, int abilitati)
+	MOVE.W	D0,SR	;pone liv int a 000
+
+* invio primo carattere:	
+INVIO1	MOVE.B	(A2),D1            ;lettura fittizia da PRB => serve per azzerare CRB7 poichè in generale non sappiamo se la macchina è in reset
+	MOVE.B	(A0),(A2)	;dato su bus di PIA porto B: dopo la scrittura di PRB, CB2 si abbassa
+*					;ciò fa abbassare CA1 sulla porta gemella dell'altro sistema generando 
+*					;un'interruzione che coincide con il segnale DATA READY
+
+	MOVE.B	#1,COUNT
+
+	
+
+
+LOOP  	JMP LOOP	;ciclo caldo dove il processore attende interrupt		
+
+
+
+DVBOUT	MOVE.B	#0,PIACB		;seleziona il registro direzione di PIA porto B 
+	MOVE.B	#$FF,PIADB	  		;accede a DRB e pone DRA=1 : le linee di B sono linee di output	
+	MOVE.B	#%00100101,PIACB   	;imposta il registro di controllo come indicato sopra
+*								;i bit CRB7 e CRB6 sono a sola lettura	
+	RTS
+
+
+	
+	ORG $8800		
+
+INT4    	MOVE.L	A1,-(A7)		;salvataggio registri
+	MOVE.L	A0,-(A7)
+	MOVE.L	D0,-(A7)
+	MOVE.L	D1,-(A7)
+	MOVE.L	D2,-(A7)
+
+	MOVEA.L	#PIADB,A1
+	MOVEA.L	#MSG,A0	;indirizzo area di salvataggio
+	MOVE.B	COUNT,D1	;contatore corrente degli elementi ricevuti
+	
+INVIO	MOVE.B	(A1),D2            ;lettura fittizia da PRB => serve per azzerare CRB7 dopo il primo carattere, altrimenti resta settato con l'ack
+	MOVE.B	(A0,D1),(A1)	;carattere corrente da trasferire in D2;
+*					;dato su bus di PIA porto B: dopo la scrittura di PRB, CB2 si abbassa
+				
+	ADD.B	#1,D1			;aggiorno il contatore degli elementi trasmessi
+	MOVE.B	D1,COUNT
+
+FINE	MOVE.L  (A7)+,D2		;ripristino registri 
+	MOVE.L  (A7)+,D1
+	MOVE.L  (A7)+,D0	
+	MOVE.L  (A7)+,A0
+	MOVE.L  (A7)+,A1
+	
+	RTE
+
+
+
+
+	END	MAIN
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

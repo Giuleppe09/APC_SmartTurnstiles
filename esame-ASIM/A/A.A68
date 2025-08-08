@@ -1,0 +1,514 @@
+	ORG $8000   *Area Dati
+    	*DEFINE
+K           	EQU 2
+N           	EQU 2
+DIM_1       	EQU 4   *KxN
+DIM_2       	EQU 4   *2N
+NONE       	EQU 0
+B           	EQU 1
+C           	EQU 2
+
+    *Indirizzi Memory-Mapped per PIAB e PIAC
+PIADAB      EQU $2004
+PIACAB      EQU $2005
+PIADAC      EQU $2008
+PIACAC      EQU $2009
+
+    *VARIABILI
+FASE        	DC.W    1       	*Cambialo !
+POSSESSO   	DC.W    NONE	*CAMBIATO PER DEBUG
+LOCK       	DC.W    0
+B_SUSP     	DC.W    0
+C_SUSP     	DC.W    0
+CTR_MEX     	DC.W    0   	*Servirà anche per contare 2 messaggi nella fase 2.
+CURR_CHAR   DC.W    0
+TOT_CHAR    	DC.W    0
+
+    *BUFFER
+BUFF_1      DS.B    DIM_1
+BUFF_2      DS.B    DIM_2
+
+
+    ORG $8200   **MAIN
+MAIN    MOVE.W  SR,D0       *Livello privilegio Utente e smascheramento interruzioni.
+    	ANDI.W  #$D8FF,D0
+    	MOVE.W  D0,SR
+
+  
+    **PIAB e PIAC**
+    	MOVE.B  #0,PIACAB
+   	MOVE.B  #0,PIACAC
+
+    **Inizializza Registro direzione PIA, tutte le linee in INPUT
+    	MOVE.B  #0,PIADAB
+   	MOVE.B  #0,PIADAC
+    **Configurazione Modo PIA
+    	MOVE.B  #%00100101,PIACAB
+    	MOVE.B  #%00100101,PIACAC
+
+LOOP   JMP	LOOP
+
+
+	ORG $8300   **ROUTINE: verifica se C è sospeso
+RT_CS		CMP.W   	#1,C_SUSP
+        		BNE     	F_RCS
+        		CMP.W   	#C,POSSESSO
+        		BNE    		F_RCS
+        		MOVE.W  	#0,C_SUSP   		*Aggiunto
+        		MOVE.W  	TOT_CHAR,D0		*index=tot_char
+        		ADDI.W  	#1,CURR_CHAR
+       		ADDI.W  	#1,TOT_CHAR
+
+        		CMP.W   	#1,FASE
+        		BNE     	B_F2        
+
+B_F1		MOVEA.L	#BUFF_1,A1
+		MOVE.B  	PIADAC,(A1,D0)
+    
+B_F2        	MOVEA.L 	#BUFF_2,A2
+       		MOVE.B  	PIADAC,(A2,D0)
+            
+F_RCS        	RTS
+
+
+		**ROUTINE: verifica se B è sospeso
+RT_BS       	CMP.W       	#1,B_SUSP   
+        		BNE    		F_RBS		*STA QUA IL PROBLEMA
+        		CMP.W   	#B,POSSESSO
+        		BNE    		F_RBS		*STAVA QUA IL PROBLEMA            
+        		MOVE.W  	TOT_CHAR,D0
+        		ADDI.W  	#1,CURR_CHAR
+        		ADDI.W  	#1,TOT_CHAR
+        		MOVE.W  	#0,B_SUSP   *Aggiunto
+        		CMP.W   	#1,FASE
+        		BNE     	C_F2
+
+C_F1       	MOVEA.L	#BUFF_1,A1
+		MOVE.B  PIADAB,(A1,D0)
+    
+C_F2        	MOVEA.L #BUFF_2,A2
+        		MOVE.B  PIADAB,(A2,D0)
+            
+F_RBS        	RTS
+
+
+    
+    	ORG $8400
+
+ISR_B       	CMP.W   	#1,FASE
+        		BNE    	 	F2
+        **FASE 1**
+F1    		TAS     		LOCK
+        		BNE     	IBS_RT
+
+        **Sezione Critica**
+        		CMP.W   	#C,POSSESSO
+        		BEQ     	ULCK_B
+        **Nell'IF del Possesso*
+        		MOVE.W  	#B,POSSESSO
+ULCK_B  	MOVE.W  	#0,LOCK
+
+
+
+
+        		MOVEM.L 	D0-D4/A1-A2,-(A7)
+SW1         	CMP.W   	#NONE,POSSESSO
+        		BEQ     	B_REST      *Che poi sarebbe case:NONE
+
+        		CMP.W   	#C,POSSESSO
+        		BEQ     	C1  
+
+
+        *Se non è NONE e non è C.....
+B1         	MOVE.W  	TOT_CHAR,D0			*Index = tot_char
+        		MOVEA.L 	#BUFF_1,A1			
+        
+        		MOVE.B  	PIADAB,(A1,D0)		*Lettura
+        		ADDI.W  	#1,TOT_CHAR
+        		ADDI.W  	#1,CURR_CHAR
+
+        *Controllo se è finito il messaggio
+        		CMP.W   	#N,CURR_CHAR
+        		BNE     	B_REST
+        
+        *Se il messaggio è terminato..
+
+        		ADDI.W  	#1,CTR_MEX
+       		MOVE.W  	#0,CURR_CHAR
+
+        *Se  sono arrivati tutti i messaggi della fase 1... SWITCH DI FASE
+        		CMP.W   	#K,CTR_MEX
+        		BNE        	CHK1CS      **Routine         
+
+        **Se sono arrivati K messaggi
+        		MOVE.W  	#2,FASE
+        		MOVE.W  	#0,TOT_CHAR 
+        		MOVE.W 	 #0,CTR_MEX      *Lo riuseremo per fase 2
+        
+        *Così il check viene effettuato a prescindere, come specificato nello pseudocodice
+
+CHK1CS  	MOVE.W  	#C,POSSESSO
+        		JSR     		RT_CS
+            
+       		BRA     	B_REST
+        
+
+
+C1          	CMP.W   	#1,C_SUSP   
+        		BNE     	B_SUSP_RT       *Perchè se C è sospeso, allora B non fa niente (Lo sospendo)... 
+        
+
+        *Se C è sospeso B farà ciò che C non ha fatto.. vivere..
+        		MOVE.W  	TOT_CHAR,D0		*Index = tot_char
+        		MOVEA.L 	#BUFF_1,A1
+        		ADDI.W  	#1,TOT_CHAR
+        		ADDI.W  	#1,CURR_CHAR
+
+        		CMP.W   	#N,CURR_CHAR
+        		BNE     	LEGGI_C 		*Lettura diretta, senza ulteriori modifiche allo stato
+        
+        *Se è finito il messaggio..
+        		ADDI.W  	#1,CTR_MEX
+        		MOVE.W  	#0,CURR_CHAR
+        
+        		CMP.W   	#K,CTR_MEX		*Fine fase 1
+        		BNE     	WRB1
+
+        *Switch di fase*
+        		MOVE.W  	#2,FASE
+        		MOVE.W  	#0,TOT_CHAR
+        		MOVE.W  	#0,CTR_MEX      *Lo riuseremo per fase 2
+
+WRB1        	MOVE.W  	#B,POSSESSO
+        		MOVE.W  	TOT_CHAR,D1
+        		ADDI.W  	#1,TOT_CHAR
+        		MOVE.B  	PIADAB,(A1,D1)
+        		MOVE.W  	#0,C_SUSP       *La lettura dove va fatta...
+        		MOVE.B  	PIADAC,(A1,D0)
+        *Non resta nulla in sospeso.
+        		BRA     	B_REST
+
+
+LEGGI_C 	MOVE.W  	#0,C_SUSP		*Legato al caso in cui devo leggere da C ma non da B successivamente.
+        		MOVE.B  	PIADAC,(A1,D0)
+        		BRA    		B_SUSP_RT
+
+
+	*FASE 2
+
+F2          	MOVEM.L 	D0-D4/A1-A2,-(A7)       **SALVATAGGIO CONTESTO**
+SW2         	CMP.W   	#NONE,POSSESSO
+        		BEQ     	B_REST      *Che poi sarebbe case:NONE
+
+        		CMP.W   	#C,POSSESSO
+        		BEQ     	C2  
+
+B2          	MOVEA.L 	#BUFF_2,A2
+        		MOVE.W  	TOT_CHAR,D0
+        		MOVE.B  	PIADAB,(A2,D0)
+        		ADDI.W  	#1,TOT_CHAR
+        		ADDI.W  	#1,CURR_CHAR
+
+        		CMP.W   	#N,CURR_CHAR
+        		BNE     	B_REST
+
+        *Fine Mex
+        		ADDI.W  	#1,CTR_MEX
+        		MOVE.W  	#0,CURR_CHAR
+
+	*Check se sono arrivati i 2 mex.
+        		CMP.W   	#2,CTR_MEX
+        		BNE     	PSC     **Setta il possesso a C
+        
+
+        *CHECK IDENTIFICATIVI
+        		MOVE.B  	#N,D1
+        		MOVE.B  	#0,D2
+        		MOVE.B  	(A2,D1),D3  
+        		MOVE.B  	(A2,D2),D4
+        		CMP.B       	D3,D4
+        		BNE     	RSTB		*RESET
+        
+        		CMP.W   	#0,D3   
+        		BNE     	RSTB		*RESET
+
+        		MOVE.W  	#NONE,POSSESSO      *FINE  
+        		BRA    	 	B_REST
+        	
+
+		*RESET e ricomincio*
+RSTB        	MOVE.W  	#0,CTR_MEX
+        		MOVE.W  	#0,TOT_CHAR
+
+PSC         	MOVE.W  	#C,POSSESSO
+        		JSR     		RT_CS
+        		BRA     	B_REST
+
+
+C2          	CMP.W   	#1,C_SUSP		*Verifica se C è sospeso.
+        		BNE     	B_SUSP_RT
+
+		*Se C è sospeso...
+        		MOVEA.L	#BUFF_2,A2
+       
+        		MOVE.W  	TOT_CHAR,D0		*index=tot_char -> da salvare per la fine.
+        		MOVE.W  	#0,C_SUSP
+        		ADDI.W  	#1,TOT_CHAR
+        		ADDI.W  	#1,CURR_CHAR
+        
+
+        *Se siamo arrivati alla fine del messaggio..
+        		CMP.W   	#N,CURR_CHAR
+        		BNE     	L_C_B           *Devo andare a leggere C comunque e poi sospendo B (dato che non c'è lo switch del possesso)
+        		ADDI.W  	#1,CTR_MEX
+        		MOVE.W  	#0,CURR_CHAR
+        
+        		CMP.W   	#2,CTR_MEX	
+        		BNE     	WRB2
+        
+        *CHECK IDENTIFICATIVI
+        		MOVEA.L 	#BUFF_2,A2		*Forse superfluo..
+        		MOVE.B  	#N,D1		*buff2[N] e buff2[0] vanno confrontati
+        		MOVE.B  	#0,D2
+        		MOVE.B  	(A2,D1),D3  
+        		MOVE.B  	(A2,D2),D4
+        		CMP.B       	D3,D4
+        		BNE     	RSTC			*Resetto
+        
+        		CMP.W   	#0,D3   
+        		BNE     	RSTC			*Resetto
+
+        		MOVE.W  	#NONE,POSSESSO      *FINE  
+        		BRA     	B_REST
+        
+RSTC        	MOVE.W  	#0,CTR_MEX
+        		MOVE.W  	#0,TOT_CHAR
+
+
+
+WRB2        	MOVE.W  	#B,POSSESSO     	*A prescindere dato che è terminato il Mex.
+        		MOVE.W  	TOT_CHAR,D1		*Leggo da B
+        		ADDI.W  	#1,TOT_CHAR		
+        		MOVE.B  	PIADAB,(A2,D1)
+
+        		MOVE.B  	PIADAC,(A2,D0)	*L'index salvato prima.
+
+
+
+
+B_REST  	MOVEM.L 	(A7)+,D0-D4/A1-A2
+        		RTE
+
+
+L_C_B		MOVE.B  	PIADAC,(A2,D0)      	*AGGIUNTA, è leggermente diverso dalla lettura fatta in WRB2 dato che qui si sospende B.
+B_SUSP_RT   	MOVEM.L 	(A7)+,D0-D4/A1-A2
+IBS_RT  	MOVE.W  	#1,B_SUSP   
+       		RTE
+
+
+
+
+
+
+
+
+	ORG $8800
+
+ISR_C       CMP.W   #1,FASE
+            BNE     F2C
+
+    **FASE 1**
+F1C         TAS     LOCK
+            BNE     ICS_RT
+
+    **Sezione Critica**
+            CMP.W   #B,POSSESSO
+            BEQ     ULCK_C
+            
+    *Nell'IF del Possesso*
+            MOVE.W  #C,POSSESSO
+ULCK_C      MOVE.W  #0,LOCK
+
+            MOVEM.L D0-D4/A1-A2,-(A7)
+SW1C        CMP.W   #NONE,POSSESSO
+            BEQ     C_REST      *Che poi sarebbe case:NONE
+
+            CMP.W   #B,POSSESSO
+            BEQ     B1C
+
+    *Se non è none e non è B.....
+C1C         MOVE.W  TOT_CHAR,D0
+            MOVEA.L #BUFF_1,A1
+            
+            MOVE.B  PIADAC,(A1,D0)
+            ADDI.W  #1,TOT_CHAR
+            ADDI.W  #1,CURR_CHAR
+
+    *Controllo se è finito il messaggio
+            CMP.W   #N,CURR_CHAR
+            BNE     LEGGI_B     ; *** MODIFICA: BNE per specularità con ISR_B (LEGGI_C) ***
+            
+    *Fine Messaggio
+            ADDI.W  #1,CTR_MEX
+            MOVE.W  #0,CURR_CHAR
+            
+    *Se sono arrivati tutti i messaggi della fase 1...
+            CMP.W   #K,CTR_MEX
+            BNE     CHK1BS      **Routine     
+
+    **Se sono arrivati K messaggi
+            MOVE.W  #2,FASE
+            MOVE.W  #0,TOT_CHAR 
+            MOVE.W  #0,CTR_MEX      *Lo riuseremo per fase 2
+            
+    *Così il check viene effettuato a prescindere, come specificato nello pseudocodice
+CHK1BS      MOVE.W  #B,POSSESSO
+            JSR     RT_BS
+            
+            BRA     C_REST
+            
+
+B1C         CMP.W   #1,B_SUSP   
+            BNE     C_SUSP_RT       *Perchè se B è sospeso, allora C non fa niente... 
+            
+
+    *Se B è sospeso C farà ciò che B non ha fatto.. vivere..
+            MOVE.W  TOT_CHAR,D0
+            MOVEA.L #BUFF_1,A1
+            ADDI.W  #1,TOT_CHAR
+            ADDI.W  #1,CURR_CHAR
+
+            CMP.W   #N,CURR_CHAR
+            BNE     LEGGI_B     ; *** MODIFICA: BNE per specularità con ISR_B (LEGGI_C) ***
+
+    *Se è finito il messaggio..
+F_MEX_B     ADDI.W  #1,CTR_MEX
+            MOVE.W  #0,CURR_CHAR
+            
+            CMP.W   #K,CTR_MEX
+            BNE     WRC1
+
+    *Switch di fase*
+            MOVE.W  #2,FASE
+            MOVE.W  #0,TOT_CHAR
+            MOVE.W  #0,CTR_MEX      *Lo riuseremo per fase 2
+
+WRC1        MOVE.W  #C,POSSESSO
+            MOVE.W  TOT_CHAR,D1
+            ADDI.W  #1,TOT_CHAR
+            MOVE.B  PIADAC,(A1,D1)
+            MOVE.W  #0,B_SUSP       ; *** AGGIUNTA per specularità con ISR_B (ULCK_B) ***
+            MOVE.B  PIADAB,(A1,D0)
+            
+            BRA     C_REST
+
+
+F2C         MOVEM.L D0-D4/A1-A2,-(A7)       **SALVATAGGIO CONTESTO**
+SW2C        CMP.W   #NONE,POSSESSO
+            BEQ     C_REST      *Che poi sarebbe case:NONE
+
+            CMP.W   #B,POSSESSO
+            BEQ     B2C
+
+C2C         MOVEA.L #BUFF_2,A2
+            MOVE.W  TOT_CHAR,D0
+            MOVE.B  PIADAC,(A2,D0)
+            ADDI.W  #1,TOT_CHAR
+            ADDI.W  #1,CURR_CHAR
+
+            CMP.W   #N,CURR_CHAR
+            BNE     C_REST
+
+    *Fine Mex
+            ADDI.W  #1,CTR_MEX
+            MOVE.W  #0,CURR_CHAR
+
+            CMP.W   #2,CTR_MEX
+            BNE     PSB     **Setta il possesso a B
+            
+            MOVEA.L #BUFF_2,A2 ; Era ripetuto, ma lo lascio per specularità se ISR_B lo ha
+    *CHECK IDENTIFICATIVI
+            MOVEA.L #BUFF_2,A2 ; Era ripetuto
+            MOVE.B  #N,D1
+            MOVE.B  #0,D2
+            MOVE.B  (A2,D1),D3  
+            MOVE.B  (A2,D2),D4
+            CMP.B           D3,D4
+            BNE     RSTC2
+            
+            CMP.W   #0,D3   
+            BNE     RSTC2
+
+            MOVE.W  #NONE,POSSESSO      *FINE  
+            BRA     C_REST
+            
+RSTC2       MOVE.W  #0,CTR_MEX
+            MOVE.W  #0,TOT_CHAR
+PSB         MOVE.W  #B,POSSESSO
+            JSR     RT_BS
+            BRA     C_REST
+
+
+B2C         CMP.W   #1,B_SUSP
+            BNE     C_SUSP_RT
+
+    *Se B è sospeso...
+            MOVE.W  #0,B_SUSP   *AGGIUNTA, era già presente ma è il punto dove B_SUSP viene azzerato
+            MOVE.W  TOT_CHAR,D0
+            ADDI.W  #1,TOT_CHAR
+            ADDI.W  #1,CURR_CHAR
+            
+
+    *Se siamo arrivati alla fine del messaggio..
+            CMP.W   #N,CURR_CHAR
+            BNE     L_B_C       *leggo piada b e sospendo c.
+            ADDI.W  #1,CTR_MEX
+            MOVE.W  #0,CURR_CHAR
+            
+            CMP.W   #2,CTR_MEX
+            BNE     WRC2
+            
+            MOVEA.L #BUFF_2,A2
+    *CHECK IDENTIFICATIVI
+            MOVE.B  #N,D1
+            MOVE.B  #0,D2
+            MOVE.B  (A2,D1),D3  
+            MOVE.B  (A2,D2),D4
+            CMP.B           D3,D4
+            BNE     RSTB2
+            
+            CMP.W   #0,D3   
+            BNE     RSTB2
+
+            MOVE.W  #NONE,POSSESSO      *FINE  
+            BRA     C_REST
+            
+RSTB2       MOVE.W  #0,CTR_MEX
+            MOVE.W  #0,TOT_CHAR
+
+
+WRC2        MOVE.W  #C,POSSESSO ; *** MODIFICA: Possesso a C per specularità con ISR_B (WRB2) ***
+            MOVE.W  TOT_CHAR,D1
+            ADDI.W  #1,TOT_CHAR
+            MOVE.B  PIADAC,(A2,D1) ; *** MODIFICA: PIADAC per specularità ***
+            MOVE.B  PIADAB,(A2,D0) ; *** MODIFICA: PIADAB per specularità ***
+
+
+C_REST      MOVEM.L (A7)+,D0-D4/A1-A2
+            RTE
+
+
+LEGGI_B     MOVE.W  #0,B_SUSP   *AGGIUNTA, era già presente
+            MOVE.B  PIADAB,(A1,D0)
+            BRA     C_SUSP_RT   ; *** MODIFICA: BRA a C_SUSP_RT per specularità ***
+
+
+L_B_C       MOVE.B  PIADAB,(A2,D0)      *Aggiunta
+C_SUSP_RT   MOVEM.L (A7)+,D0-D4/A1-A2
+ICS_RT      MOVE.W  #1,C_SUSP   
+            RTE
+            
+        
+    END MAIN
+
+

@@ -1,0 +1,515 @@
+00008000                                     1  	ORG $8000   *Area Dati
+00008000                                     2      	*DEFINE
+00008000  =00000002                          3  K           	EQU 2
+00008000  =00000002                          4  N           	EQU 2
+00008000  =00000004                          5  DIM_1       	EQU 4   *KxN
+00008000  =00000004                          6  DIM_2       	EQU 4   *2N
+00008000  =00000000                          7  NONE       	EQU 0
+00008000  =00000001                          8  B           	EQU 1
+00008000  =00000002                          9  C           	EQU 2
+00008000                                    10  
+00008000                                    11      *Indirizzi Memory-Mapped per PIAB e PIAC
+00008000  =00002004                         12  PIADAB      EQU $2004
+00008000  =00002005                         13  PIACAB      EQU $2005
+00008000  =00002008                         14  PIADAC      EQU $2008
+00008000  =00002009                         15  PIACAC      EQU $2009
+00008000                                    16  
+00008000                                    17      *VARIABILI
+00008000  0001                              18  FASE        	DC.W    1       	*Cambialo !
+00008002  0000                              19  POSSESSO   	DC.W    NONE	*CAMBIATO PER DEBUG
+00008004  0000                              20  LOCK       	DC.W    0
+00008006  0000                              21  B_SUSP     	DC.W    0
+00008008  0000                              22  C_SUSP     	DC.W    0
+0000800A  0000                              23  CTR_MEX     	DC.W    0   	*Servirà anche per contare 2 messaggi nella fase 2.
+0000800C  0000                              24  CURR_CHAR   DC.W    0
+0000800E  0000                              25  TOT_CHAR    	DC.W    0
+00008010                                    26  
+00008010                                    27      *BUFFER
+00008010                                    28  BUFF_1      DS.B    DIM_1
+00008014                                    29  BUFF_2      DS.B    DIM_2
+00008018                                    30  
+00008018                                    31  
+00008200                                    32      ORG $8200   **MAIN
+00008200  40C0                              33  MAIN    MOVE.W  SR,D0       *Livello privilegio Utente e smascheramento interruzioni.
+00008202  0240 D8FF                         34      	ANDI.W  #$D8FF,D0
+00008206  46C0                              35      	MOVE.W  D0,SR
+00008208                                    36  
+00008208                                    37    
+00008208                                    38      **PIAB e PIAC**
+00008208  11FC 0000 2005                    39      	MOVE.B  #0,PIACAB
+0000820E  11FC 0000 2009                    40     	MOVE.B  #0,PIACAC
+00008214                                    41  
+00008214                                    42      **Inizializza Registro direzione PIA, tutte le linee in INPUT
+00008214  11FC 0000 2004                    43      	MOVE.B  #0,PIADAB
+0000821A  11FC 0000 2008                    44     	MOVE.B  #0,PIADAC
+00008220                                    45      **Configurazione Modo PIA
+00008220  11FC 0025 2005                    46      	MOVE.B  #%00100101,PIACAB
+00008226  11FC 0025 2009                    47      	MOVE.B  #%00100101,PIACAC
+0000822C                                    48  
+0000822C  4EF9 0000822C                     49  LOOP   JMP	LOOP
+00008232                                    50  
+00008232                                    51  
+00008300                                    52  	ORG $8300   **ROUTINE: verifica se C è sospeso
+00008300  0C79 0001 00008008                53  RT_CS		CMP.W   	#1,C_SUSP
+00008308  6600 004C                         54          		BNE     	F_RCS
+0000830C  0C79 0002 00008002                55          		CMP.W   	#C,POSSESSO
+00008314  6600 0040                         56          		BNE    		F_RCS
+00008318  33FC 0000 00008008                57          		MOVE.W  	#0,C_SUSP   		*Aggiunto
+00008320  3039 0000800E                     58          		MOVE.W  	TOT_CHAR,D0		*index=tot_char
+00008326  5279 0000800C                     59          		ADDI.W  	#1,CURR_CHAR
+0000832C  5279 0000800E                     60         		ADDI.W  	#1,TOT_CHAR
+00008332                                    61  
+00008332  0C79 0001 00008000                62          		CMP.W   	#1,FASE
+0000833A  6600 000E                         63          		BNE     	B_F2        
+0000833E                                    64  
+0000833E  227C 00008010                     65  B_F1		MOVEA.L	#BUFF_1,A1
+00008344  13B8 2008 0000                    66  		MOVE.B  	PIADAC,(A1,D0)
+0000834A                                    67      
+0000834A  247C 00008014                     68  B_F2        	MOVEA.L 	#BUFF_2,A2
+00008350  15B8 2008 0000                    69         		MOVE.B  	PIADAC,(A2,D0)
+00008356                                    70              
+00008356  4E75                              71  F_RCS        	RTS
+00008358                                    72  
+00008358                                    73  
+00008358                                    74  		**ROUTINE: verifica se B è sospeso
+00008358  0C79 0001 00008006                75  RT_BS       	CMP.W       	#1,B_SUSP   
+00008360  6600 004C                         76          		BNE    		F_RBS		*STA QUA IL PROBLEMA
+00008364  0C79 0001 00008002                77          		CMP.W   	#B,POSSESSO
+0000836C  6600 0040                         78          		BNE    		F_RBS		*STAVA QUA IL PROBLEMA            
+00008370  3039 0000800E                     79          		MOVE.W  	TOT_CHAR,D0
+00008376  5279 0000800C                     80          		ADDI.W  	#1,CURR_CHAR
+0000837C  5279 0000800E                     81          		ADDI.W  	#1,TOT_CHAR
+00008382  33FC 0000 00008006                82          		MOVE.W  	#0,B_SUSP   *Aggiunto
+0000838A  0C79 0001 00008000                83          		CMP.W   	#1,FASE
+00008392  6600 000E                         84          		BNE     	C_F2
+00008396                                    85  
+00008396  227C 00008010                     86  C_F1       	MOVEA.L	#BUFF_1,A1
+0000839C  13B8 2004 0000                    87  		MOVE.B  PIADAB,(A1,D0)
+000083A2                                    88      
+000083A2  247C 00008014                     89  C_F2        	MOVEA.L #BUFF_2,A2
+000083A8  15B8 2004 0000                    90          		MOVE.B  PIADAB,(A2,D0)
+000083AE                                    91              
+000083AE  4E75                              92  F_RBS        	RTS
+000083B0                                    93  
+000083B0                                    94  
+000083B0                                    95      
+00008400                                    96      	ORG $8400
+00008400                                    97  
+00008400  0C79 0001 00008000                98  ISR_B       	CMP.W   	#1,FASE
+00008408  6600 0152                         99          		BNE    	 	F2
+0000840C                                   100          **FASE 1**
+0000840C  4AF9 00008004                    101  F1    		TAS     		LOCK
+00008412  6600 02B6                        102          		BNE     	IBS_RT
+00008416                                   103  
+00008416                                   104          **Sezione Critica**
+00008416  0C79 0002 00008002               105          		CMP.W   	#C,POSSESSO
+0000841E  6700 000A                        106          		BEQ     	ULCK_B
+00008422                                   107          **Nell'IF del Possesso*
+00008422  33FC 0001 00008002               108          		MOVE.W  	#B,POSSESSO
+0000842A  33FC 0000 00008004               109  ULCK_B  	MOVE.W  	#0,LOCK
+00008432                                   110  
+00008432                                   111  
+00008432                                   112  
+00008432                                   113  
+00008432  48E7 F860                        114          		MOVEM.L 	D0-D4/A1-A2,-(A7)
+00008436  0C79 0000 00008002               115  SW1         	CMP.W   	#NONE,POSSESSO
+0000843E  6700 027A                        116          		BEQ     	B_REST      *Che poi sarebbe case:NONE
+00008442                                   117  
+00008442  0C79 0002 00008002               118          		CMP.W   	#C,POSSESSO
+0000844A  6700 0070                        119          		BEQ     	C1  
+0000844E                                   120  
+0000844E                                   121  
+0000844E                                   122          *Se non è NONE e non è C.....
+0000844E  3039 0000800E                    123  B1         	MOVE.W  	TOT_CHAR,D0			*Index = tot_char
+00008454  227C 00008010                    124          		MOVEA.L 	#BUFF_1,A1			
+0000845A                                   125          
+0000845A  13B8 2004 0000                   126          		MOVE.B  	PIADAB,(A1,D0)		*Lettura
+00008460  5279 0000800E                    127          		ADDI.W  	#1,TOT_CHAR
+00008466  5279 0000800C                    128          		ADDI.W  	#1,CURR_CHAR
+0000846C                                   129  
+0000846C                                   130          *Controllo se è finito il messaggio
+0000846C  0C79 0002 0000800C               131          		CMP.W   	#N,CURR_CHAR
+00008474  6600 0244                        132          		BNE     	B_REST
+00008478                                   133          
+00008478                                   134          *Se il messaggio è terminato..
+00008478                                   135  
+00008478  5279 0000800A                    136          		ADDI.W  	#1,CTR_MEX
+0000847E  33FC 0000 0000800C               137         		MOVE.W  	#0,CURR_CHAR
+00008486                                   138  
+00008486                                   139          *Se  sono arrivati tutti i messaggi della fase 1... SWITCH DI FASE
+00008486  0C79 0002 0000800A               140          		CMP.W   	#K,CTR_MEX
+0000848E  6600 001A                        141          		BNE        	CHK1CS      **Routine         
+00008492                                   142  
+00008492                                   143          **Se sono arrivati K messaggi
+00008492  33FC 0002 00008000               144          		MOVE.W  	#2,FASE
+0000849A  33FC 0000 0000800E               145          		MOVE.W  	#0,TOT_CHAR 
+000084A2  33FC 0000 0000800A               146          		MOVE.W 	 #0,CTR_MEX      *Lo riuseremo per fase 2
+000084AA                                   147          
+000084AA                                   148          *Così il check viene effettuato a prescindere, come specificato nello pseudocodice
+000084AA                                   149  
+000084AA  33FC 0002 00008002               150  CHK1CS  	MOVE.W  	#C,POSSESSO
+000084B2  4EB9 00008300                    151          		JSR     		RT_CS
+000084B8                                   152              
+000084B8  6000 0200                        153         		BRA     	B_REST
+000084BC                                   154          
+000084BC                                   155  
+000084BC                                   156  
+000084BC  0C79 0001 00008008               157  C1          	CMP.W   	#1,C_SUSP   
+000084C4  6600 0200                        158          		BNE     	B_SUSP_RT       *Perchè se C è sospeso, allora B non fa niente (Lo sospendo)... 
+000084C8                                   159          
+000084C8                                   160  
+000084C8                                   161          *Se C è sospeso B farà ciò che C non ha fatto.. vivere..
+000084C8  3039 0000800E                    162          		MOVE.W  	TOT_CHAR,D0		*Index = tot_char
+000084CE  227C 00008010                    163          		MOVEA.L 	#BUFF_1,A1
+000084D4  5279 0000800E                    164          		ADDI.W  	#1,TOT_CHAR
+000084DA  5279 0000800C                    165          		ADDI.W  	#1,CURR_CHAR
+000084E0                                   166  
+000084E0  0C79 0002 0000800C               167          		CMP.W   	#N,CURR_CHAR
+000084E8  6600 0060                        168          		BNE     	LEGGI_C 		*Lettura diretta, senza ulteriori modifiche allo stato
+000084EC                                   169          
+000084EC                                   170          *Se è finito il messaggio..
+000084EC  5279 0000800A                    171          		ADDI.W  	#1,CTR_MEX
+000084F2  33FC 0000 0000800C               172          		MOVE.W  	#0,CURR_CHAR
+000084FA                                   173          
+000084FA  0C79 0002 0000800A               174          		CMP.W   	#K,CTR_MEX		*Fine fase 1
+00008502  6600 001A                        175          		BNE     	WRB1
+00008506                                   176  
+00008506                                   177          *Switch di fase*
+00008506  33FC 0002 00008000               178          		MOVE.W  	#2,FASE
+0000850E  33FC 0000 0000800E               179          		MOVE.W  	#0,TOT_CHAR
+00008516  33FC 0000 0000800A               180          		MOVE.W  	#0,CTR_MEX      *Lo riuseremo per fase 2
+0000851E                                   181  
+0000851E  33FC 0001 00008002               182  WRB1        	MOVE.W  	#B,POSSESSO
+00008526  3239 0000800E                    183          		MOVE.W  	TOT_CHAR,D1
+0000852C  5279 0000800E                    184          		ADDI.W  	#1,TOT_CHAR
+00008532  13B8 2004 1000                   185          		MOVE.B  	PIADAB,(A1,D1)
+00008538  33FC 0000 00008008               186          		MOVE.W  	#0,C_SUSP       *La lettura dove va fatta...
+00008540  13B8 2008 0000                   187          		MOVE.B  	PIADAC,(A1,D0)
+00008546                                   188          *Non resta nulla in sospeso.
+00008546  6000 0172                        189          		BRA     	B_REST
+0000854A                                   190  
+0000854A                                   191  
+0000854A  33FC 0000 00008008               192  LEGGI_C 	MOVE.W  	#0,C_SUSP		*Legato al caso in cui devo leggere da C ma non da B successivamente.
+00008552  13B8 2008 0000                   193          		MOVE.B  	PIADAC,(A1,D0)
+00008558  6000 016C                        194          		BRA    		B_SUSP_RT
+0000855C                                   195  
+0000855C                                   196  
+0000855C                                   197  	*FASE 2
+0000855C                                   198  
+0000855C  48E7 F860                        199  F2          	MOVEM.L 	D0-D4/A1-A2,-(A7)       **SALVATAGGIO CONTESTO**
+00008560  0C79 0000 00008002               200  SW2         	CMP.W   	#NONE,POSSESSO
+00008568  6700 0150                        201          		BEQ     	B_REST      *Che poi sarebbe case:NONE
+0000856C                                   202  
+0000856C  0C79 0002 00008002               203          		CMP.W   	#C,POSSESSO
+00008574  6700 0092                        204          		BEQ     	C2  
+00008578                                   205  
+00008578  247C 00008014                    206  B2          	MOVEA.L 	#BUFF_2,A2
+0000857E  3039 0000800E                    207          		MOVE.W  	TOT_CHAR,D0
+00008584  15B8 2004 0000                   208          		MOVE.B  	PIADAB,(A2,D0)
+0000858A  5279 0000800E                    209          		ADDI.W  	#1,TOT_CHAR
+00008590  5279 0000800C                    210          		ADDI.W  	#1,CURR_CHAR
+00008596                                   211  
+00008596  0C79 0002 0000800C               212          		CMP.W   	#N,CURR_CHAR
+0000859E  6600 011A                        213          		BNE     	B_REST
+000085A2                                   214  
+000085A2                                   215          *Fine Mex
+000085A2  5279 0000800A                    216          		ADDI.W  	#1,CTR_MEX
+000085A8  33FC 0000 0000800C               217          		MOVE.W  	#0,CURR_CHAR
+000085B0                                   218  
+000085B0                                   219  	*Check se sono arrivati i 2 mex.
+000085B0  0C79 0002 0000800A               220          		CMP.W   	#2,CTR_MEX
+000085B8  6600 003C                        221          		BNE     	PSC     **Setta il possesso a C
+000085BC                                   222          
+000085BC                                   223  
+000085BC                                   224          *CHECK IDENTIFICATIVI
+000085BC  123C 0002                        225          		MOVE.B  	#N,D1
+000085C0  143C 0000                        226          		MOVE.B  	#0,D2
+000085C4  1632 1000                        227          		MOVE.B  	(A2,D1),D3  
+000085C8  1832 2000                        228          		MOVE.B  	(A2,D2),D4
+000085CC  B803                             229          		CMP.B       	D3,D4
+000085CE  6600 0016                        230          		BNE     	RSTB		*RESET
+000085D2                                   231          
+000085D2  B67C 0000                        232          		CMP.W   	#0,D3   
+000085D6  6600 000E                        233          		BNE     	RSTB		*RESET
+000085DA                                   234  
+000085DA  33FC 0000 00008002               235          		MOVE.W  	#NONE,POSSESSO      *FINE  
+000085E2  6000 00D6                        236          		BRA    	 	B_REST
+000085E6                                   237          	
+000085E6                                   238  
+000085E6                                   239  		*RESET e ricomincio*
+000085E6  33FC 0000 0000800A               240  RSTB        	MOVE.W  	#0,CTR_MEX
+000085EE  33FC 0000 0000800E               241          		MOVE.W  	#0,TOT_CHAR
+000085F6                                   242  
+000085F6  33FC 0002 00008002               243  PSC         	MOVE.W  	#C,POSSESSO
+000085FE  4EB9 00008300                    244          		JSR     		RT_CS
+00008604  6000 00B4                        245          		BRA     	B_REST
+00008608                                   246  
+00008608                                   247  
+00008608  0C79 0001 00008008               248  C2          	CMP.W   	#1,C_SUSP		*Verifica se C è sospeso.
+00008610  6600 00B4                        249          		BNE     	B_SUSP_RT
+00008614                                   250  
+00008614                                   251  		*Se C è sospeso...
+00008614  247C 00008014                    252          		MOVEA.L	#BUFF_2,A2
+0000861A                                   253         
+0000861A  3039 0000800E                    254          		MOVE.W  	TOT_CHAR,D0		*index=tot_char -> da salvare per la fine.
+00008620  33FC 0000 00008008               255          		MOVE.W  	#0,C_SUSP
+00008628  5279 0000800E                    256          		ADDI.W  	#1,TOT_CHAR
+0000862E  5279 0000800C                    257          		ADDI.W  	#1,CURR_CHAR
+00008634                                   258          
+00008634                                   259  
+00008634                                   260          *Se siamo arrivati alla fine del messaggio..
+00008634  0C79 0002 0000800C               261          		CMP.W   	#N,CURR_CHAR
+0000863C  6600 0082                        262          		BNE     	L_C_B           *Devo andare a leggere C comunque e poi sospendo B (dato che non c'è lo switch del possesso)
+00008640  5279 0000800A                    263          		ADDI.W  	#1,CTR_MEX
+00008646  33FC 0000 0000800C               264          		MOVE.W  	#0,CURR_CHAR
+0000864E                                   265          
+0000864E  0C79 0002 0000800A               266          		CMP.W   	#2,CTR_MEX	
+00008656  6600 0042                        267          		BNE     	WRB2
+0000865A                                   268          
+0000865A                                   269          *CHECK IDENTIFICATIVI
+0000865A  247C 00008014                    270          		MOVEA.L 	#BUFF_2,A2		*Forse superfluo..
+00008660  123C 0002                        271          		MOVE.B  	#N,D1		*buff2[N] e buff2[0] vanno confrontati
+00008664  143C 0000                        272          		MOVE.B  	#0,D2
+00008668  1632 1000                        273          		MOVE.B  	(A2,D1),D3  
+0000866C  1832 2000                        274          		MOVE.B  	(A2,D2),D4
+00008670  B803                             275          		CMP.B       	D3,D4
+00008672  6600 0016                        276          		BNE     	RSTC			*Resetto
+00008676                                   277          
+00008676  B67C 0000                        278          		CMP.W   	#0,D3   
+0000867A  6600 000E                        279          		BNE     	RSTC			*Resetto
+0000867E                                   280  
+0000867E  33FC 0000 00008002               281          		MOVE.W  	#NONE,POSSESSO      *FINE  
+00008686  6000 0032                        282          		BRA     	B_REST
+0000868A                                   283          
+0000868A  33FC 0000 0000800A               284  RSTC        	MOVE.W  	#0,CTR_MEX
+00008692  33FC 0000 0000800E               285          		MOVE.W  	#0,TOT_CHAR
+0000869A                                   286  
+0000869A                                   287  
+0000869A                                   288  
+0000869A  33FC 0001 00008002               289  WRB2        	MOVE.W  	#B,POSSESSO     	*A prescindere dato che è terminato il Mex.
+000086A2  3239 0000800E                    290          		MOVE.W  	TOT_CHAR,D1		*Leggo da B
+000086A8  5279 0000800E                    291          		ADDI.W  	#1,TOT_CHAR		
+000086AE  15B8 2004 1000                   292          		MOVE.B  	PIADAB,(A2,D1)
+000086B4                                   293  
+000086B4  15B8 2008 0000                   294          		MOVE.B  	PIADAC,(A2,D0)	*L'index salvato prima.
+000086BA                                   295  
+000086BA                                   296  
+000086BA                                   297  
+000086BA                                   298  
+000086BA  4CDF 061F                        299  B_REST  	MOVEM.L 	(A7)+,D0-D4/A1-A2
+000086BE  4E73                             300          		RTE
+000086C0                                   301  
+000086C0                                   302  
+000086C0  15B8 2008 0000                   303  L_C_B		MOVE.B  	PIADAC,(A2,D0)      	*AGGIUNTA, è leggermente diverso dalla lettura fatta in WRB2 dato che qui si sospende B.
+000086C6  4CDF 061F                        304  B_SUSP_RT   	MOVEM.L 	(A7)+,D0-D4/A1-A2
+000086CA  33FC 0001 00008006               305  IBS_RT  	MOVE.W  	#1,B_SUSP   
+000086D2  4E73                             306         		RTE
+000086D4                                   307  
+000086D4                                   308  
+000086D4                                   309  
+000086D4                                   310  
+000086D4                                   311  
+000086D4                                   312  
+000086D4                                   313  
+000086D4                                   314  
+00008800                                   315  	ORG $8800
+00008800                                   316  
+00008800  0C79 0001 00008000               317  ISR_C       CMP.W   #1,FASE
+00008808  6600 0140                        318              BNE     F2C
+0000880C                                   319  
+0000880C                                   320      **FASE 1**
+0000880C  4AF9 00008004                    321  F1C         TAS     LOCK
+00008812  6600 02BC                        322              BNE     ICS_RT
+00008816                                   323  
+00008816                                   324      **Sezione Critica**
+00008816  0C79 0001 00008002               325              CMP.W   #B,POSSESSO
+0000881E  6700 000A                        326              BEQ     ULCK_C
+00008822                                   327              
+00008822                                   328      *Nell'IF del Possesso*
+00008822  33FC 0002 00008002               329              MOVE.W  #C,POSSESSO
+0000882A  33FC 0000 00008004               330  ULCK_C      MOVE.W  #0,LOCK
+00008832                                   331  
+00008832  48E7 F860                        332              MOVEM.L D0-D4/A1-A2,-(A7)
+00008836  0C79 0000 00008002               333  SW1C        CMP.W   #NONE,POSSESSO
+0000883E  6700 026E                        334              BEQ     C_REST      *Che poi sarebbe case:NONE
+00008842                                   335  
+00008842  0C79 0001 00008002               336              CMP.W   #B,POSSESSO
+0000884A  6700 0070                        337              BEQ     B1C
+0000884E                                   338  
+0000884E                                   339      *Se non è none e non è B.....
+0000884E  3039 0000800E                    340  C1C         MOVE.W  TOT_CHAR,D0
+00008854  227C 00008010                    341              MOVEA.L #BUFF_1,A1
+0000885A                                   342              
+0000885A  13B8 2008 0000                   343              MOVE.B  PIADAC,(A1,D0)
+00008860  5279 0000800E                    344              ADDI.W  #1,TOT_CHAR
+00008866  5279 0000800C                    345              ADDI.W  #1,CURR_CHAR
+0000886C                                   346  
+0000886C                                   347      *Controllo se è finito il messaggio
+0000886C  0C79 0002 0000800C               348              CMP.W   #N,CURR_CHAR
+00008874  6600 023E                        349              BNE     LEGGI_B     ; *** MODIFICA: BNE per specularità con ISR_B (LEGGI_C) ***
+00008878                                   350              
+00008878                                   351      *Fine Messaggio
+00008878  5279 0000800A                    352              ADDI.W  #1,CTR_MEX
+0000887E  33FC 0000 0000800C               353              MOVE.W  #0,CURR_CHAR
+00008886                                   354              
+00008886                                   355      *Se sono arrivati tutti i messaggi della fase 1...
+00008886  0C79 0002 0000800A               356              CMP.W   #K,CTR_MEX
+0000888E  6600 001A                        357              BNE     CHK1BS      **Routine     
+00008892                                   358  
+00008892                                   359      **Se sono arrivati K messaggi
+00008892  33FC 0002 00008000               360              MOVE.W  #2,FASE
+0000889A  33FC 0000 0000800E               361              MOVE.W  #0,TOT_CHAR 
+000088A2  33FC 0000 0000800A               362              MOVE.W  #0,CTR_MEX      *Lo riuseremo per fase 2
+000088AA                                   363              
+000088AA                                   364      *Così il check viene effettuato a prescindere, come specificato nello pseudocodice
+000088AA  33FC 0001 00008002               365  CHK1BS      MOVE.W  #B,POSSESSO
+000088B2  4EB9 00008358                    366              JSR     RT_BS
+000088B8                                   367              
+000088B8  6000 01F4                        368              BRA     C_REST
+000088BC                                   369              
+000088BC                                   370  
+000088BC  0C79 0001 00008006               371  B1C         CMP.W   #1,B_SUSP   
+000088C4  6600 0206                        372              BNE     C_SUSP_RT       *Perchè se B è sospeso, allora C non fa niente... 
+000088C8                                   373              
+000088C8                                   374  
+000088C8                                   375      *Se B è sospeso C farà ciò che B non ha fatto.. vivere..
+000088C8  3039 0000800E                    376              MOVE.W  TOT_CHAR,D0
+000088CE  227C 00008010                    377              MOVEA.L #BUFF_1,A1
+000088D4  5279 0000800E                    378              ADDI.W  #1,TOT_CHAR
+000088DA  5279 0000800C                    379              ADDI.W  #1,CURR_CHAR
+000088E0                                   380  
+000088E0  0C79 0002 0000800C               381              CMP.W   #N,CURR_CHAR
+000088E8  6600 01CA                        382              BNE     LEGGI_B     ; *** MODIFICA: BNE per specularità con ISR_B (LEGGI_C) ***
+000088EC                                   383  
+000088EC                                   384      *Se è finito il messaggio..
+000088EC  5279 0000800A                    385  F_MEX_B     ADDI.W  #1,CTR_MEX
+000088F2  33FC 0000 0000800C               386              MOVE.W  #0,CURR_CHAR
+000088FA                                   387              
+000088FA  0C79 0002 0000800A               388              CMP.W   #K,CTR_MEX
+00008902  6600 001A                        389              BNE     WRC1
+00008906                                   390  
+00008906                                   391      *Switch di fase*
+00008906  33FC 0002 00008000               392              MOVE.W  #2,FASE
+0000890E  33FC 0000 0000800E               393              MOVE.W  #0,TOT_CHAR
+00008916  33FC 0000 0000800A               394              MOVE.W  #0,CTR_MEX      *Lo riuseremo per fase 2
+0000891E                                   395  
+0000891E  33FC 0002 00008002               396  WRC1        MOVE.W  #C,POSSESSO
+00008926  3239 0000800E                    397              MOVE.W  TOT_CHAR,D1
+0000892C  5279 0000800E                    398              ADDI.W  #1,TOT_CHAR
+00008932  13B8 2008 1000                   399              MOVE.B  PIADAC,(A1,D1)
+00008938  33FC 0000 00008006               400              MOVE.W  #0,B_SUSP       ; *** AGGIUNTA per specularità con ISR_B (ULCK_B) ***
+00008940  13B8 2004 0000                   401              MOVE.B  PIADAB,(A1,D0)
+00008946                                   402              
+00008946  6000 0166                        403              BRA     C_REST
+0000894A                                   404  
+0000894A                                   405  
+0000894A  48E7 F860                        406  F2C         MOVEM.L D0-D4/A1-A2,-(A7)       **SALVATAGGIO CONTESTO**
+0000894E  0C79 0000 00008002               407  SW2C        CMP.W   #NONE,POSSESSO
+00008956  6700 0156                        408              BEQ     C_REST      *Che poi sarebbe case:NONE
+0000895A                                   409  
+0000895A  0C79 0001 00008002               410              CMP.W   #B,POSSESSO
+00008962  6700 009E                        411              BEQ     B2C
+00008966                                   412  
+00008966  247C 00008014                    413  C2C         MOVEA.L #BUFF_2,A2
+0000896C  3039 0000800E                    414              MOVE.W  TOT_CHAR,D0
+00008972  15B8 2008 0000                   415              MOVE.B  PIADAC,(A2,D0)
+00008978  5279 0000800E                    416              ADDI.W  #1,TOT_CHAR
+0000897E  5279 0000800C                    417              ADDI.W  #1,CURR_CHAR
+00008984                                   418  
+00008984  0C79 0002 0000800C               419              CMP.W   #N,CURR_CHAR
+0000898C  6600 0120                        420              BNE     C_REST
+00008990                                   421  
+00008990                                   422      *Fine Mex
+00008990  5279 0000800A                    423              ADDI.W  #1,CTR_MEX
+00008996  33FC 0000 0000800C               424              MOVE.W  #0,CURR_CHAR
+0000899E                                   425  
+0000899E  0C79 0002 0000800A               426              CMP.W   #2,CTR_MEX
+000089A6  6600 0048                        427              BNE     PSB     **Setta il possesso a B
+000089AA                                   428              
+000089AA  247C 00008014                    429              MOVEA.L #BUFF_2,A2 ; Era ripetuto, ma lo lascio per specularità se ISR_B lo ha
+000089B0                                   430      *CHECK IDENTIFICATIVI
+000089B0  247C 00008014                    431              MOVEA.L #BUFF_2,A2 ; Era ripetuto
+000089B6  123C 0002                        432              MOVE.B  #N,D1
+000089BA  143C 0000                        433              MOVE.B  #0,D2
+000089BE  1632 1000                        434              MOVE.B  (A2,D1),D3  
+000089C2  1832 2000                        435              MOVE.B  (A2,D2),D4
+000089C6  B803                             436              CMP.B           D3,D4
+000089C8  6600 0016                        437              BNE     RSTC2
+000089CC                                   438              
+000089CC  B67C 0000                        439              CMP.W   #0,D3   
+000089D0  6600 000E                        440              BNE     RSTC2
+000089D4                                   441  
+000089D4  33FC 0000 00008002               442              MOVE.W  #NONE,POSSESSO      *FINE  
+000089DC  6000 00D0                        443              BRA     C_REST
+000089E0                                   444              
+000089E0  33FC 0000 0000800A               445  RSTC2       MOVE.W  #0,CTR_MEX
+000089E8  33FC 0000 0000800E               446              MOVE.W  #0,TOT_CHAR
+000089F0  33FC 0001 00008002               447  PSB         MOVE.W  #B,POSSESSO
+000089F8  4EB9 00008358                    448              JSR     RT_BS
+000089FE  6000 00AE                        449              BRA     C_REST
+00008A02                                   450  
+00008A02                                   451  
+00008A02  0C79 0001 00008006               452  B2C         CMP.W   #1,B_SUSP
+00008A0A  6600 00C0                        453              BNE     C_SUSP_RT
+00008A0E                                   454  
+00008A0E                                   455      *Se B è sospeso...
+00008A0E  33FC 0000 00008006               456              MOVE.W  #0,B_SUSP   *AGGIUNTA, era già presente ma è il punto dove B_SUSP viene azzerato
+00008A16  3039 0000800E                    457              MOVE.W  TOT_CHAR,D0
+00008A1C  5279 0000800E                    458              ADDI.W  #1,TOT_CHAR
+00008A22  5279 0000800C                    459              ADDI.W  #1,CURR_CHAR
+00008A28                                   460              
+00008A28                                   461  
+00008A28                                   462      *Se siamo arrivati alla fine del messaggio..
+00008A28  0C79 0002 0000800C               463              CMP.W   #N,CURR_CHAR
+00008A30  6600 0094                        464              BNE     L_B_C       *leggo piada b e sospendo c.
+00008A34  5279 0000800A                    465              ADDI.W  #1,CTR_MEX
+00008A3A  33FC 0000 0000800C               466              MOVE.W  #0,CURR_CHAR
+00008A42                                   467              
+00008A42  0C79 0002 0000800A               468              CMP.W   #2,CTR_MEX
+00008A4A  6600 0042                        469              BNE     WRC2
+00008A4E                                   470              
+00008A4E  247C 00008014                    471              MOVEA.L #BUFF_2,A2
+00008A54                                   472      *CHECK IDENTIFICATIVI
+00008A54  123C 0002                        473              MOVE.B  #N,D1
+00008A58  143C 0000                        474              MOVE.B  #0,D2
+00008A5C  1632 1000                        475              MOVE.B  (A2,D1),D3  
+00008A60  1832 2000                        476              MOVE.B  (A2,D2),D4
+00008A64  B803                             477              CMP.B           D3,D4
+00008A66  6600 0016                        478              BNE     RSTB2
+00008A6A                                   479              
+00008A6A  B67C 0000                        480              CMP.W   #0,D3   
+00008A6E  6600 000E                        481              BNE     RSTB2
+00008A72                                   482  
+00008A72  33FC 0000 00008002               483              MOVE.W  #NONE,POSSESSO      *FINE  
+00008A7A  6000 0032                        484              BRA     C_REST
+00008A7E                                   485              
+00008A7E  33FC 0000 0000800A               486  RSTB2       MOVE.W  #0,CTR_MEX
+00008A86  33FC 0000 0000800E               487              MOVE.W  #0,TOT_CHAR
+00008A8E                                   488  
+00008A8E                                   489  
+00008A8E  33FC 0002 00008002               490  WRC2        MOVE.W  #C,POSSESSO ; *** MODIFICA: Possesso a C per specularità con ISR_B (WRB2) ***
+00008A96  3239 0000800E                    491              MOVE.W  TOT_CHAR,D1
+00008A9C  5279 0000800E                    492              ADDI.W  #1,TOT_CHAR
+00008AA2  15B8 2008 1000                   493              MOVE.B  PIADAC,(A2,D1) ; *** MODIFICA: PIADAC per specularità ***
+00008AA8  15B8 2004 0000                   494              MOVE.B  PIADAB,(A2,D0) ; *** MODIFICA: PIADAB per specularità ***
+00008AAE                                   495  
+00008AAE                                   496  
+00008AAE  4CDF 061F                        497  C_REST      MOVEM.L (A7)+,D0-D4/A1-A2
+00008AB2  4E73                             498              RTE
+00008AB4                                   499  
+00008AB4                                   500  
+00008AB4  33FC 0000 00008006               501  LEGGI_B     MOVE.W  #0,B_SUSP   *AGGIUNTA, era già presente
+00008ABC  13B8 2004 0000                   502              MOVE.B  PIADAB,(A1,D0)
+00008AC2  6000 0008                        503              BRA     C_SUSP_RT   ; *** MODIFICA: BRA a C_SUSP_RT per specularità ***
+00008AC6                                   504  
+00008AC6                                   505  
+00008AC6  15B8 2004 0000                   506  L_B_C       MOVE.B  PIADAB,(A2,D0)      *Aggiunta
+00008ACC  4CDF 061F                        507  C_SUSP_RT   MOVEM.L (A7)+,D0-D4/A1-A2
+00008AD0  33FC 0001 00008008               508  ICS_RT      MOVE.W  #1,C_SUSP   
+00008AD8  4E73                             509              RTE
+00008ADA                                   510              
+00008ADA                                   511          
+00008ADA                                   512      END MAIN
+
+No errors detected
+No warnings generated

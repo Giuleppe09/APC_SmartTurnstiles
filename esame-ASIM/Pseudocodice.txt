@@ -1,0 +1,127 @@
+
+
+ROUTINE_Check_CSusp(){
+    if(C_Susp && possesso == C){
+        C_Susp = 0
+        curr_char++
+        tot_char++
+        if(fase==1){
+            BUFF1[tot_char-1]=PIADAC
+        }else{
+            BUFF2[tot_char-1]=PIADAC
+        }
+    }
+}
+
+ISR_B: 
+    if(fase==fase1){
+        if(TAS(Lock)){
+            if(possesso!=C)
+                possesso=B
+        
+        Lock = 0
+        }else{
+            B_Susp=1
+            RTE
+        }
+
+        switch(possesso){
+            case B:
+                BUFF1[tot_char++] = PIADAB
+                curr_char++
+                if(curr_char==N){
+                    ctx_mex++
+                    curr_char = 0
+
+                    if(ctx_mex == k){
+                        fase = fase 2
+                        tot_char = 0
+                        ctx_mex = 0
+                        //Li riuso per la fase 2
+                    }
+                    possesso = C
+
+                    ROUTINE_Check_CSusp()
+
+                }
+
+            case C:
+                if(C_Susp){
+                    C_Susp = 0
+                    index = tot_char
+                    tot_char++
+                    curr_char++
+                    if(curr_char==N){
+                        ctx_mex++
+                        curr_char =0
+                        if(ctx_mex == k){
+                            fase = 2
+                            tot_char = 0
+                            ctx_mex = 0
+                        }
+                        possesso = B
+                        BUFF1[tot_char++]=PIADAB
+                    }else{
+                        B_susp=1
+                    }
+
+                    BUFF1[index] = PIADAC    //Va fatto a prescindere!
+
+                }else{
+                    B_Susp=1
+                }
+        }
+    }else{
+        //Fase 2
+
+        switch(possesso){
+            case B:
+                BUFF2[tot_char++]=PIADAB
+                curr_char++
+                if(curr_char==N){
+                    ctx_mex++
+                    curr_char=0
+                    if(ctx_mex==2){ //CHECK
+                        if(BUFF2[0]==BUFF2[N] && BUFF2[0]==0){
+                            possesso = NONE //FINITO
+                        }else{
+                            ctx_mex =0  //RESET
+                            tot_char=0  //Riutilizzo lo stesso buff
+                        }
+                    }
+                    possesso = C
+
+                    ROUTINE_Check_CSusp()
+                }
+
+            case C:
+                if(C_Susp){
+                    C_Susp=0
+                    index = tot_char
+                    curr_char++
+                    tot_char++
+
+                    if(curr_char==N){
+                        ctx_mex++
+                        curr_char = 0
+                        if(ctx_mex == 2){
+                            //CHECK
+                            if(BUFF2[0]==BUFF2[N] && BUFF2[0]==0){
+                                possesso=NONE
+                            }else{
+                                ctx_mex=0
+                                tot_char=0
+                            }
+                        
+                        }
+                        possesso = B
+                        BUFF2[tot_char++] = PIADAB
+                    }else{
+                        B_Susp = 1
+                    }
+                    BUFF2[index]=PIADAC
+                }else{
+                    B_Susp = 1
+                }
+        }
+    }
